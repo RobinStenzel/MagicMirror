@@ -1,5 +1,2 @@
-# MagicMirror
-MakerFaire Project using Kinect v.2.0
-
-Capturing persons in front of the kinect camera and adding objects and functionalities
-
+# kinect-basketball-spinner
+Basketball Spinner using Kinect v2 and Unity3D. Augmented Reality App.
