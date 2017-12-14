@@ -3,18 +3,11 @@ using UnityEditor;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using UnityEditor.Callbacks;
 
 public static class KinectCopyPluginDataHelper
 {
-    [PostProcessBuild]
-    public static void OnPostProcessBuild(BuildTarget target, string path)
-    {
-        CopyPluginData(target, path, "Face", "NuiDatabase");
-    }
-
     private const string DataDirSuffix = "_Data";
-    private const string PluginsDirName = @"Plugins";
+    private const string PluginsDirName = "Plugins";
 
     private static Dictionary<BuildTarget, string> TargetToDirName = new Dictionary<BuildTarget, string>()
         {
@@ -22,10 +15,10 @@ public static class KinectCopyPluginDataHelper
             {BuildTarget.StandaloneWindows64, "x86_64"}
         };
 
-    public static void CopyPluginData(BuildTarget target, string buildTargetPath, string subDirToSrc, string subDirToCopy)
+    public static void CopyPluginData(BuildTarget target, string buildTargetPath, string subDirToCopy)
     {
         string subDirName;
-        if (!TargetToDirName.TryGetValue(target, out subDirName))
+        if (!TargetToDirName.TryGetValue (target, out subDirName))
         {
             // No work to do
             return;
@@ -38,9 +31,9 @@ public static class KinectCopyPluginDataHelper
 
         var buildDataDir = targetDir.FullName + separator + buildName + DataDirSuffix + separator;
         var tgtPluginsDir = buildDataDir + separator + PluginsDirName + separator + subDirToCopy + separator;
-        var srcPluginsDir = Application.dataPath + separator + PluginsDirName + separator + subDirName + separator + subDirToSrc + separator + subDirToCopy + separator;
+        var srcPluginsDir = Application.dataPath + separator + PluginsDirName + separator + subDirName + separator + subDirToCopy + separator;
 
-        CopyAll(new DirectoryInfo(srcPluginsDir), new DirectoryInfo(tgtPluginsDir));
+        CopyAll (new DirectoryInfo (srcPluginsDir), new DirectoryInfo(tgtPluginsDir));
     }
 
     /// <summary>
@@ -63,9 +56,9 @@ public static class KinectCopyPluginDataHelper
         // Copy each file into it’s new directory.
         foreach (var fileInfo in source.GetFiles())
         {
-            fileInfo.CopyTo(Path.Combine(target.ToString(), fileInfo.Name), true);
+            fileInfo.CopyTo (Path.Combine (target.ToString (), fileInfo.Name), true);
         }
-
+        
         // Copy each subdirectory using recursion.
         foreach (var subDirInfo in source.GetDirectories())
         {
