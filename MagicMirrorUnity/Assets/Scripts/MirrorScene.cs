@@ -26,6 +26,7 @@ public class MirrorScene : MonoBehaviour
     // Parameters
     public float scale = 2f;
     public float speed = 10f;
+    public string expressionState = "idle";
 
     void Start()
     {
@@ -116,6 +117,7 @@ public class MirrorScene : MonoBehaviour
                                         var eyeLeftClosed = result.FaceProperties[FaceProperty.LeftEyeClosed];
                                         var eyeRightClosed = result.FaceProperties[FaceProperty.RightEyeClosed];
                                         var mouthOpen = result.FaceProperties[FaceProperty.MouthOpen];
+                                        var happy = result.FaceProperties[FaceProperty.Happy];
 
                                         // Detect the hand (left or right) that is closest to the sensor.
                                         var handTipRight = body.Joints[JointType.HandTipRight].Position;
@@ -142,14 +144,40 @@ public class MirrorScene : MonoBehaviour
                                         var worldLeft = Camera.main.ViewportToWorldPoint(new Vector3(positionLeft.x / width, positionLeft.y / height, 0f));
                                         var centerHand = (worldRight + worldLeft) / 2;
                                         var center = quad.GetComponent<Renderer>().bounds.center;
-                                        var currentBallPosition = centerHand;
+                                        
 
                                         //Use Expressions to change behaviour
                                         if (eyeLeftClosed == DetectionResult.Yes || eyeLeftClosed == DetectionResult.Maybe)
                                         {
-                                            currentBallPosition = worldLeft;
+                                            expressionState = "leftEyeClosed";
                                         }
-                                        
+                                        if (eyeRightClosed == DetectionResult.Yes || eyeRightClosed == DetectionResult.Maybe)
+                                        {
+                                            expressionState = "rightEyeClosed";
+                                            print("RIGGHT EYE CLOSED");
+                                        }
+                                        if (happy == DetectionResult.Yes || happy == DetectionResult.Maybe)
+                                        {
+                                            expressionState = "idle";
+                                            print("happy");
+                                        }
+
+
+                                        var currentBallPosition = centerHand;
+
+                                        switch (expressionState)
+                                        {
+                                            case "idle": currentBallPosition = centerHand;
+                                                break;
+
+                                            case "leftEyeClosed": currentBallPosition = worldLeft;
+                                                break;
+
+                                            case "rightEyeClosed": currentBallPosition = worldRight;
+                                                break;
+
+                                       
+                                        }
                                         
                                         // Move and rotate the ball.
                                         ball.transform.localScale = new Vector3(scale, scale, scale) / closer.Z;
