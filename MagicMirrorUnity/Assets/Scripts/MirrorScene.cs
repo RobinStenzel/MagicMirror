@@ -22,12 +22,30 @@ public class MirrorScene : MonoBehaviour
     // Visual elements.
     public GameObject quad;
     public GameObject ball;
+    public GameObject hair;
 
     // Parameters
     public float scale = 2f;
     public float speed = 10f;
     public string expressionState = "idle";
 
+    //Transform a 3d kinect point to a 2d point
+    Vector3 map3dPointTo2d(CameraSpacePoint startPoint)
+    {
+        var colorPoint = sensor.CoordinateMapper.MapCameraPointToColorSpace(startPoint);
+        var resultVector = new Vector2(0f, 0f);
+
+
+        if (!float.IsInfinity(colorPoint.X) && !float.IsInfinity(colorPoint.Y))
+        {
+            resultVector.x = colorPoint.X;
+            resultVector.y = colorPoint.Y;
+        }
+
+        // Map the 2D position to the Unity space.
+        Vector3 worldPoint = Camera.main.ViewportToWorldPoint(new Vector3(resultVector.x / width, resultVector.y / height, 0f));
+        return worldPoint;
+    }
     void Start()
     {
         sensor = KinectSensor.GetDefault();
@@ -124,24 +142,9 @@ public class MirrorScene : MonoBehaviour
                                         var handTipLeft = body.Joints[JointType.HandTipLeft].Position;
                                         var closer = handTipRight.Z < handTipLeft.Z ? handTipRight : handTipLeft;
 
-                                     
-                                        // Map the 3D position of the hand to the 2D color frame (1920x1080).
-                                        var pointRight = sensor.CoordinateMapper.MapCameraPointToColorSpace(handTipRight);
-                                        var pointLeft = sensor.CoordinateMapper.MapCameraPointToColorSpace(handTipLeft);
-                                        var positionRight = new Vector2(0f, 0f);
-                                        var positionLeft = new Vector2(0f, 0f);
-
-                                        if (!float.IsInfinity(pointRight.X) && !float.IsInfinity(pointRight.Y) && !float.IsInfinity(pointLeft.X) && !float.IsInfinity(pointLeft.Y))
-                                        {
-                                            positionRight.x = pointRight.X;
-                                            positionRight.y = pointRight.Y;
-                                            positionLeft.x = pointLeft.X;
-                                            positionLeft.y = pointLeft.Y;
-                                        }
-
                                         // Map the 2D position to the Unity space.
-                                        var worldRight = Camera.main.ViewportToWorldPoint(new Vector3(positionRight.x / width, positionRight.y / height, 0f));
-                                        var worldLeft = Camera.main.ViewportToWorldPoint(new Vector3(positionLeft.x / width, positionLeft.y / height, 0f));
+                                        var worldRight = map3dPointTo2d(handTipRight);
+                                        var worldLeft = map3dPointTo2d(handTipLeft);
                                         var centerHand = (worldRight + worldLeft) / 2;
                                         var center = quad.GetComponent<Renderer>().bounds.center;
                                         
@@ -156,7 +159,7 @@ public class MirrorScene : MonoBehaviour
                                             expressionState = "rightEyeClosed";
                                             print("RIGGHT EYE CLOSED");
                                         }
-                                        if (happy == DetectionResult.Yes || happy == DetectionResult.Maybe)
+                                        if (happy == DetectionResult.Yes)
                                         {
                                             expressionState = "idle";
                                             print("happy");
@@ -181,7 +184,7 @@ public class MirrorScene : MonoBehaviour
                                         
                                         // Move and rotate the ball.
                                         ball.transform.localScale = new Vector3(scale, scale, scale) / closer.Z;
-                                        ball.transform.position = new Vector3(currentBallPosition.x - 0.5f - center.x, -currentBallPosition.y + 0.5f, -1f);
+                                        ball.transform.position = new Vector3(currentBallPosition.x - center.x, -currentBallPosition.y + 0.5f, -1f);
                                         ball.transform.Rotate(0f, speed, 0f);
                                     }
                                 }
