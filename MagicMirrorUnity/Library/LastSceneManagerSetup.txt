@@ -1,4 +1,4 @@
 sceneSetups:
-- path: Assets/Scenes/MirrorScene.unity
+- path: Assets/MirrorScene.unity
   isLoaded: 1
   isActive: 1

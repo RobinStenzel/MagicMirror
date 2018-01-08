@@ -11,8 +11,21 @@ public class MirrorScene : MonoBehaviour
     private BodyFrameReader bodyReader;
     private FaceFrameSource faceSource;
     private FaceFrameReader faceReader;
+    // Acquires HD face data and reads it.
+    private HighDefinitionFaceFrameSource HDfaceSource = null;
+    private HighDefinitionFaceFrameReader HDfaceReader = null;
+
+    // Required to access the face vertices.
+    private FaceAlignment _faceAlignment = null;
+
+    // Required to access the face model points.
+    private FaceModel _faceModel = null;
     private Body[] bodies;
-    
+
+    //points tracked by the HD reader
+    CameraSpacePoint frontHeadCenter, leftCheekBone, rightCheekBone, nose;
+    float maxDistanceCheeks = 0;
+
     // Color frame display.
     private Texture2D texture;
     private byte[] pixels;
@@ -46,6 +59,22 @@ public class MirrorScene : MonoBehaviour
         Vector3 worldPoint = Camera.main.ViewportToWorldPoint(new Vector3(resultVector.x / width, resultVector.y / height, 0f));
         return worldPoint;
     }
+    //help function for the HD face recognition
+    private void UpdateFacePoints()
+    {
+        if (_faceModel == null) return;
+
+        var vertices = _faceModel.CalculateVerticesForAlignment(_faceAlignment);
+        if (vertices.Count > 0)
+        {
+            frontHeadCenter = vertices[28];
+            leftCheekBone = vertices[458];
+            rightCheekBone = vertices[674];
+            //nose = vertices[18];
+
+
+        }
+    }
     void Start()
     {
         sensor = KinectSensor.GetDefault();
@@ -66,6 +95,12 @@ public class MirrorScene : MonoBehaviour
                                                               FaceFrameFeatures.PointsInColorSpace |
                                                               FaceFrameFeatures.RightEyeClosed);
             faceReader = faceSource.OpenReader();
+
+            // Listen for HD face data.
+            HDfaceSource = HighDefinitionFaceFrameSource.Create(sensor);
+            HDfaceReader = HDfaceSource.OpenReader();
+            _faceModel = FaceModel.Create();
+            _faceAlignment = FaceAlignment.Create();
 
             // Body frame data.
             bodies = new Body[sensor.BodyFrameSource.BodyCount];
@@ -98,7 +133,18 @@ public class MirrorScene : MonoBehaviour
                 }
             }
         }
-
+        //HD face frame, update points and allignement
+        if (HDfaceReader != null)
+        {
+            using (var frame = HDfaceReader.AcquireLatestFrame())
+            {
+                if (frame != null && frame.IsFaceTracked)
+                {
+                    frame.GetAndRefreshFaceAlignmentResult(_faceAlignment);
+                    UpdateFacePoints();
+                }
+            }
+        }
         if (bodyReader != null)
         {
             using (var frame = bodyReader.AcquireLatestFrame())
@@ -108,13 +154,16 @@ public class MirrorScene : MonoBehaviour
                     frame.GetAndRefreshBodyData(bodies);
 
                     var body = bodies.Where(b => b.IsTracked).FirstOrDefault();
-                   
                     if (body != null)
                     {
                         //Assign face to tracked body
                         if (!faceSource.IsTrackingIdValid)
                         {
                             faceSource.TrackingId = body.TrackingId;
+                        }
+                        if (!HDfaceSource.IsTrackingIdValid)
+                        {
+                            HDfaceSource.TrackingId = body.TrackingId;
                         }
                         if (faceReader != null)
                         {
@@ -125,6 +174,7 @@ public class MirrorScene : MonoBehaviour
                                     FaceFrameResult result = faceFrame.FaceFrameResult;
                                     if(result != null)
                                     {
+                                        
                                         // Detect Face Positions and Expressions
                                         var eyeLeft = result.FacePointsInColorSpace[FacePointType.EyeLeft];
                                         var eyeRight = result.FacePointsInColorSpace[FacePointType.EyeRight];
@@ -145,6 +195,11 @@ public class MirrorScene : MonoBehaviour
                                         // Map the 2D position to the Unity space.
                                         var worldRight = map3dPointTo2d(handTipRight);
                                         var worldLeft = map3dPointTo2d(handTipLeft);
+                                        var worldLeftCheek = map3dPointTo2d(leftCheekBone);
+                                        var worldRightCheek = map3dPointTo2d(rightCheekBone);
+                                        var distanceCheeks = worldRightCheek.x - worldLeftCheek.x;
+                                        var worldFrontHead = map3dPointTo2d(frontHeadCenter);
+
                                         var centerHand = (worldRight + worldLeft) / 2;
                                         var center = quad.GetComponent<Renderer>().bounds.center;
                                         
@@ -181,11 +236,15 @@ public class MirrorScene : MonoBehaviour
 
                                        
                                         }
-                                        
+
                                         // Move and rotate the ball.
-                                        ball.transform.localScale = new Vector3(scale, scale, scale) / closer.Z;
-                                        ball.transform.position = new Vector3(currentBallPosition.x - center.x, -currentBallPosition.y + 0.5f, -1f);
-                                        ball.transform.Rotate(0f, speed, 0f);
+                                        //ball.transform.localScale = new Vector3(scale, scale, scale) / closer.Z;
+                                        //ball.transform.position = new Vector3(currentBallPosition.x - center.x, -currentBallPosition.y + 0.5f, -1f);
+                                        //ball.transform.Rotate(0f, speed, 0f);
+
+                                        //Show hair
+                                        hair.transform.localScale = new Vector3(distanceCheeks*400, distanceCheeks*400, distanceCheeks*400);
+                                        hair.transform.position = new Vector3(worldFrontHead.x - center.x -1f*distanceCheeks, -worldFrontHead.y- distanceCheeks*3.8f, -1f);
                                     }
                                 }
                             }
@@ -212,6 +271,16 @@ public class MirrorScene : MonoBehaviour
         if(faceReader != null)
         {
             faceReader.Dispose();
+        }
+
+        if (HDfaceReader != null)
+        {
+            HDfaceReader.Dispose();
+        }
+
+        if (_faceModel != null)
+        {
+            _faceModel.Dispose();
         }
 
         if (sensor != null && sensor.IsOpen)
