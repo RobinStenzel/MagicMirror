@@ -2,6 +2,7 @@
 using System.Linq;
 using Windows.Kinect;
 using Microsoft.Kinect.Face;
+using UnityEngine.UI;
 
 public class MirrorScene : MonoBehaviour
 {
@@ -11,6 +12,7 @@ public class MirrorScene : MonoBehaviour
     private BodyFrameReader bodyReader;
     private FaceFrameSource faceSource;
     private FaceFrameReader faceReader;
+
     // Acquires HD face data and reads it.
     private HighDefinitionFaceFrameSource HDfaceSource = null;
     private HighDefinitionFaceFrameReader HDfaceReader = null;
@@ -23,8 +25,8 @@ public class MirrorScene : MonoBehaviour
     private Body[] bodies;
 
     //points tracked by the HD reader
-    CameraSpacePoint frontHeadCenter, leftCheekBone, rightCheekBone, nose;
-    float maxDistanceCheeks = 0;
+    CameraSpacePoint frontHeadCenter, leftCheekBone, rightCheekBone;
+    float reference = 1;
 
     // Color frame display.
     private Texture2D texture;
@@ -36,11 +38,23 @@ public class MirrorScene : MonoBehaviour
     public GameObject quad;
     public GameObject ball;
     public GameObject hair;
+    public GameObject textboxManager;
 
     // Parameters
     public float scale = 2f;
     public float speed = 10f;
     public string expressionState = "idle";
+
+    //Strings for texbox
+    public Text textboxLeft;
+    private string stringEyeLeft = "";
+    private string stringEyeRight = "";
+    private string stringMouthOpen = "";
+    private string stringHappy = "";
+    private string stringGlasses = "";
+    
+    
+
 
     //Transform a 3d kinect point to a 2d point
     Vector3 map3dPointTo2d(CameraSpacePoint startPoint)
@@ -70,10 +84,48 @@ public class MirrorScene : MonoBehaviour
             frontHeadCenter = vertices[28];
             leftCheekBone = vertices[458];
             rightCheekBone = vertices[674];
-            //nose = vertices[18];
+        }
+    }
 
+    //function to update face expressions
+    void updateExpressions(FaceFrameResult result)
+    {
+        // Detect Face Positions and Expressions
+        var eyeLeftClosed = result.FaceProperties[FaceProperty.LeftEyeClosed];
+        var eyeRightClosed = result.FaceProperties[FaceProperty.RightEyeClosed];
+        var mouthOpen = result.FaceProperties[FaceProperty.MouthOpen];
+        var happy = result.FaceProperties[FaceProperty.Happy];
+
+        //Use Expressions to change behaviour
+        if (eyeLeftClosed == DetectionResult.Yes || eyeLeftClosed == DetectionResult.Maybe)
+        {
+            expressionState = "leftEyeClosed";
+            stringEyeLeft = "left eye: yes or maybe";
+        }
+        else
+        {
+            stringEyeLeft = "left eye: no";
+        }
+        if (eyeRightClosed == DetectionResult.Yes || eyeRightClosed == DetectionResult.Maybe)
+        {
+            expressionState = "rightEyeClosed";
+            stringEyeRight = "right eye: yes or maybe";
+        }
+        else
+        {
+            stringEyeRight = "right eye: no";
+        }
+        if (happy == DetectionResult.Yes)
+        {
+            expressionState = "idle";
+            stringHappy = "happy: yes";
+        }
+        else
+        {
+            stringHappy = "happy: no";
 
         }
+
     }
     void Start()
     {
@@ -134,7 +186,7 @@ public class MirrorScene : MonoBehaviour
             }
         }
         //HD face frame, update points and allignement
-        if (HDfaceReader != null)
+        /*if (HDfaceReader != null)
         {
             using (var frame = HDfaceReader.AcquireLatestFrame())
             {
@@ -144,7 +196,7 @@ public class MirrorScene : MonoBehaviour
                     UpdateFacePoints();
                 }
             }
-        }
+        }*/
         if (bodyReader != null)
         {
             using (var frame = bodyReader.AcquireLatestFrame())
@@ -174,77 +226,61 @@ public class MirrorScene : MonoBehaviour
                                     FaceFrameResult result = faceFrame.FaceFrameResult;
                                     if(result != null)
                                     {
+                                        updateExpressions(result);
+                                        textboxLeft.text = stringEyeLeft + System.Environment.NewLine
+                                        + stringEyeRight + System.Environment.NewLine + stringHappy;
                                         
-                                        // Detect Face Positions and Expressions
-                                        var eyeLeft = result.FacePointsInColorSpace[FacePointType.EyeLeft];
-                                        var eyeRight = result.FacePointsInColorSpace[FacePointType.EyeRight];
-                                        var nose = result.FacePointsInColorSpace[FacePointType.Nose];
-                                        var mouthLeft = result.FacePointsInColorSpace[FacePointType.MouthCornerLeft];
-                                        var mouthRight = result.FacePointsInColorSpace[FacePointType.MouthCornerRight];
-
-                                        var eyeLeftClosed = result.FaceProperties[FaceProperty.LeftEyeClosed];
-                                        var eyeRightClosed = result.FaceProperties[FaceProperty.RightEyeClosed];
-                                        var mouthOpen = result.FaceProperties[FaceProperty.MouthOpen];
-                                        var happy = result.FaceProperties[FaceProperty.Happy];
 
                                         // Detect the hand (left or right) that is closest to the sensor.
-                                        var handTipRight = body.Joints[JointType.HandTipRight].Position;
-                                        var handTipLeft = body.Joints[JointType.HandTipLeft].Position;
-                                        var closer = handTipRight.Z < handTipLeft.Z ? handTipRight : handTipLeft;
+                                        var handRight = body.Joints[JointType.HandTipRight].Position;
+                                        var handLeft = body.Joints[JointType.HandTipLeft].Position;
+                                        var closer = handRight.Z < handLeft.Z ? handRight : handLeft;
 
                                         // Map the 2D position to the Unity space.
-                                        var worldRight = map3dPointTo2d(handTipRight);
-                                        var worldLeft = map3dPointTo2d(handTipLeft);
+                                        var worldRight = map3dPointTo2d(handRight);
+                                        var worldLeft = map3dPointTo2d(handLeft);
                                         var worldLeftCheek = map3dPointTo2d(leftCheekBone);
                                         var worldRightCheek = map3dPointTo2d(rightCheekBone);
                                         var distanceCheeks = worldRightCheek.x - worldLeftCheek.x;
                                         var worldFrontHead = map3dPointTo2d(frontHeadCenter);
+                                        var worldCloser = map3dPointTo2d(closer);
 
                                         var centerHand = (worldRight + worldLeft) / 2;
                                         var center = quad.GetComponent<Renderer>().bounds.center;
                                         
 
-                                        //Use Expressions to change behaviour
-                                        if (eyeLeftClosed == DetectionResult.Yes || eyeLeftClosed == DetectionResult.Maybe)
-                                        {
-                                            expressionState = "leftEyeClosed";
-                                        }
-                                        if (eyeRightClosed == DetectionResult.Yes || eyeRightClosed == DetectionResult.Maybe)
-                                        {
-                                            expressionState = "rightEyeClosed";
-                                            print("RIGGHT EYE CLOSED");
-                                        }
-                                        if (happy == DetectionResult.Yes)
-                                        {
-                                            expressionState = "idle";
-                                            print("happy");
-                                        }
-
+                                        
 
                                         var currentBallPosition = centerHand;
 
                                         switch (expressionState)
                                         {
-                                            case "idle": currentBallPosition = centerHand;
+                                            case "idle":
+                                                currentBallPosition = centerHand;
+                                                reference = (handRight.Z + handLeft.Z)/2;
                                                 break;
 
-                                            case "leftEyeClosed": currentBallPosition = worldLeft;
+                                            case "leftEyeClosed":
+                                                currentBallPosition = worldLeft;
+                                                reference = handLeft.Z;
                                                 break;
 
-                                            case "rightEyeClosed": currentBallPosition = worldRight;
+                                            case "rightEyeClosed":
+                                                currentBallPosition = worldRight;
+                                                reference = handRight.Z;
                                                 break;
 
                                        
                                         }
 
                                         // Move and rotate the ball.
-                                        //ball.transform.localScale = new Vector3(scale, scale, scale) / closer.Z;
-                                        //ball.transform.position = new Vector3(currentBallPosition.x - center.x, -currentBallPosition.y + 0.5f, -1f);
+                                        ball.transform.localScale = new Vector3(scale, scale, scale) / reference;
+                                        ball.transform.position = new Vector3(currentBallPosition.x - center.x, -currentBallPosition.y, -1f);
                                         //ball.transform.Rotate(0f, speed, 0f);
 
                                         //Show hair
-                                        hair.transform.localScale = new Vector3(distanceCheeks*400, distanceCheeks*400, distanceCheeks*400);
-                                        hair.transform.position = new Vector3(worldFrontHead.x - center.x -1f*distanceCheeks, -worldFrontHead.y- distanceCheeks*3.8f, -1f);
+                                        //hair.transform.localScale = new Vector3(distanceCheeks*400, distanceCheeks*400, distanceCheeks*400);
+                                        //hair.transform.position = new Vector3(worldFrontHead.x - center.x -1f*distanceCheeks, -worldFrontHead.y- distanceCheeks*3.8f, -1f);
                                     }
                                 }
                             }
