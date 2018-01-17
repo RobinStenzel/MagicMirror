@@ -39,6 +39,8 @@ public class MirrorScene : MonoBehaviour
     public GameObject ball;
     public GameObject hair;
     public GameObject textboxManager;
+    public GameObject auraRed1;
+    public GameObject auraRed2;
 
     // Parameters
     public float scale = 2f;
@@ -52,9 +54,33 @@ public class MirrorScene : MonoBehaviour
     private string stringMouthOpen = "";
     private string stringHappy = "";
     private string stringGlasses = "";
-    
-    
 
+    //Color changing over time
+    private bool flagHair = false;
+    private bool flagBall = false;
+    private float tHair = 0;
+    private float tBall = 0;
+
+
+    private void changeColorOfGameObject(UnityEngine.Color inColor, UnityEngine.Color outColor, GameObject obj, ref bool flag, ref float t)
+    {
+        float duration = 3f;
+        UnityEngine.Color lerpedColor = UnityEngine.Color.Lerp(inColor, outColor, t);
+        obj.GetComponent<Renderer>().material.color = lerpedColor;
+
+        if (flag == true)
+        {
+            t -= Time.deltaTime / duration;
+            if (t < 0.01f)
+                flag = false;
+        }
+        else
+        {
+            t += Time.deltaTime / duration;
+            if (t > 0.99f)
+                flag = true;
+        }
+    }
 
     //Transform a 3d kinect point to a 2d point
     Vector3 map3dPointTo2d(CameraSpacePoint startPoint)
@@ -95,12 +121,14 @@ public class MirrorScene : MonoBehaviour
         var eyeRightClosed = result.FaceProperties[FaceProperty.RightEyeClosed];
         var mouthOpen = result.FaceProperties[FaceProperty.MouthOpen];
         var happy = result.FaceProperties[FaceProperty.Happy];
+        var glasses = result.FaceProperties[FaceProperty.WearingGlasses];
 
         //Use Expressions to change behaviour
         if (eyeLeftClosed == DetectionResult.Yes || eyeLeftClosed == DetectionResult.Maybe)
         {
             expressionState = "leftEyeClosed";
-            stringEyeLeft = "left eye: yes or maybe";
+            stringEyeLeft = "left eye: ";
+            stringEyeLeft += eyeLeftClosed == DetectionResult.Yes ? "yes" : "maybe";
         }
         else
         {
@@ -109,21 +137,36 @@ public class MirrorScene : MonoBehaviour
         if (eyeRightClosed == DetectionResult.Yes || eyeRightClosed == DetectionResult.Maybe)
         {
             expressionState = "rightEyeClosed";
-            stringEyeRight = "right eye: yes or maybe";
+            stringEyeRight = "right eye: ";
+            stringEyeRight += eyeRightClosed == DetectionResult.Yes ? "yes" : "maybe";
         }
         else
         {
             stringEyeRight = "right eye: no";
         }
-        if (happy == DetectionResult.Yes)
+        if (happy == DetectionResult.Yes || happy == DetectionResult.Maybe)
         {
-            expressionState = "idle";
-            stringHappy = "happy: yes";
+            expressionState = happy == DetectionResult.Yes ? "idle": expressionState;
+            stringHappy = "smile: ";
+            stringHappy += happy == DetectionResult.Yes ? "yes" : "maybe";
         }
         else
         {
-            stringHappy = "happy: no";
+            stringHappy = "smile: no";
 
+        }
+        if(mouthOpen == DetectionResult.Yes || mouthOpen == DetectionResult.Maybe)
+        {
+            stringMouthOpen = "Mouth opened";
+            stringMouthOpen += mouthOpen == DetectionResult.Yes ? "yes" : "no";
+        }
+        if(glasses == DetectionResult.Yes)
+        {
+            stringGlasses = "glasses: yes";
+        }
+        else
+        {
+            stringGlasses = "glasses: no";
         }
 
     }
@@ -186,7 +229,7 @@ public class MirrorScene : MonoBehaviour
             }
         }
         //HD face frame, update points and allignement
-        /*if (HDfaceReader != null)
+        if (HDfaceReader != null)
         {
             using (var frame = HDfaceReader.AcquireLatestFrame())
             {
@@ -196,7 +239,7 @@ public class MirrorScene : MonoBehaviour
                     UpdateFacePoints();
                 }
             }
-        }*/
+        }
         if (bodyReader != null)
         {
             using (var frame = bodyReader.AcquireLatestFrame())
@@ -228,12 +271,14 @@ public class MirrorScene : MonoBehaviour
                                     {
                                         updateExpressions(result);
                                         textboxLeft.text = stringEyeLeft + System.Environment.NewLine
-                                        + stringEyeRight + System.Environment.NewLine + stringHappy;
+                                        + stringEyeRight + System.Environment.NewLine + stringHappy + System.Environment.NewLine
+                                        + stringGlasses;
                                         
 
                                         // Detect the hand (left or right) that is closest to the sensor.
                                         var handRight = body.Joints[JointType.HandTipRight].Position;
                                         var handLeft = body.Joints[JointType.HandTipLeft].Position;
+                                        var spineMid = body.Joints[JointType.Head].Position;
                                         var closer = handRight.Z < handLeft.Z ? handRight : handLeft;
 
                                         // Map the 2D position to the Unity space.
@@ -244,6 +289,7 @@ public class MirrorScene : MonoBehaviour
                                         var distanceCheeks = worldRightCheek.x - worldLeftCheek.x;
                                         var worldFrontHead = map3dPointTo2d(frontHeadCenter);
                                         var worldCloser = map3dPointTo2d(closer);
+                                        var worldSpineMid = map3dPointTo2d(spineMid);
 
                                         var centerHand = (worldRight + worldLeft) / 2;
                                         var center = quad.GetComponent<Renderer>().bounds.center;
@@ -277,10 +323,17 @@ public class MirrorScene : MonoBehaviour
                                         ball.transform.localScale = new Vector3(scale, scale, scale) / reference;
                                         ball.transform.position = new Vector3(currentBallPosition.x - center.x, -currentBallPosition.y, -1f);
                                         //ball.transform.Rotate(0f, speed, 0f);
+                                        //auraRed1.transform.localScale = new Vector3(scale, 1.8f*scale, scale) / spineMid.Z / 3;
+                                        //auraRed1.transform.position = new Vector3(worldSpineMid.x + center.x, -worldSpineMid.y -reference + scale, -1f);
+                                        //auraRed2.transform.localScale = new Vector3(scale, scale, scale) / spineMid.Z / 2;
+                                        //auraRed2.transform.position = new Vector3(worldSpineMid.x + center.x- scale, -worldSpineMid.y - 2*scale, -1f);
+
 
                                         //Show hair
-                                        //hair.transform.localScale = new Vector3(distanceCheeks*400, distanceCheeks*400, distanceCheeks*400);
-                                        //hair.transform.position = new Vector3(worldFrontHead.x - center.x -1f*distanceCheeks, -worldFrontHead.y- distanceCheeks*3.8f, -1f);
+                                        hair.transform.localScale = new Vector3(distanceCheeks*400, distanceCheeks*400, distanceCheeks*400);
+                                        hair.transform.position = new Vector3(worldFrontHead.x - center.x , -worldFrontHead.y- distanceCheeks*3.8f, -1f);
+                                        changeColorOfGameObject(UnityEngine.Color.black, UnityEngine.Color.yellow, hair, ref flagHair, ref tHair);
+                                        changeColorOfGameObject(UnityEngine.Color.yellow, UnityEngine.Color.blue, ball, ref flagBall, ref tBall);
                                     }
                                 }
                             }
