@@ -3,6 +3,7 @@ using System.Linq;
 using Windows.Kinect;
 using Microsoft.Kinect.Face;
 using UnityEngine.UI;
+using UnityEngine.Video;
 
 public class MirrorScene : MonoBehaviour
 {
@@ -39,27 +40,34 @@ public class MirrorScene : MonoBehaviour
     public GameObject ball;
     public GameObject hair;
     public GameObject textboxManager;
-    public GameObject auraRed1;
-    public GameObject auraRed2;
+    public GameObject videoTransformation;
+    public VideoPlayer vp;
 
     // Parameters
     public float scale = 2f;
     public float speed = 10f;
     public string expressionState = "idle";
 
-    //Strings for texbox
+    //Strings for texbox and UI
+    private float powerLevel = 0;
     public Text textboxLeft;
     private string stringEyeLeft = "";
     private string stringEyeRight = "";
     private string stringMouthOpen = "";
     private string stringHappy = "";
     private string stringGlasses = "";
+    private string stringPowerLevel = "";
 
     //Color changing over time
     private bool flagHair = false;
     private bool flagBall = false;
     private float tHair = 0;
     private float tBall = 0;
+
+    //Measuring time
+    private float startTime = 0;
+    private float ellapsedTime = 0;
+    private bool timeChecker = false;
 
 
     private void changeColorOfGameObject(UnityEngine.Color inColor, UnityEngine.Color outColor, GameObject obj, ref bool flag, ref float t)
@@ -172,6 +180,12 @@ public class MirrorScene : MonoBehaviour
     }
     void Start()
     {
+        Renderer rend = videoTransformation.GetComponent<Renderer>();
+        rend.enabled = true;
+        rend = ball.GetComponent<Renderer>();
+        rend.enabled = false;
+        rend = hair.GetComponent<Renderer>();
+        rend.enabled = false;
         sensor = KinectSensor.GetDefault();
 
         if (sensor != null)
@@ -272,37 +286,69 @@ public class MirrorScene : MonoBehaviour
                                         updateExpressions(result);
                                         textboxLeft.text = stringEyeLeft + System.Environment.NewLine
                                         + stringEyeRight + System.Environment.NewLine + stringHappy + System.Environment.NewLine
-                                        + stringGlasses;
+                                        + stringGlasses + System.Environment.NewLine + stringPowerLevel;
                                         
 
                                         // Detect the hand (left or right) that is closest to the sensor.
                                         var handRight = body.Joints[JointType.HandTipRight].Position;
                                         var handLeft = body.Joints[JointType.HandTipLeft].Position;
-                                        var spineMid = body.Joints[JointType.Head].Position;
+                                        var spineMid = body.Joints[JointType.SpineMid].Position;
+                                        var elbowLeft = body.Joints[JointType.ElbowLeft].Position;
+                                        var elbowRight = body.Joints[JointType.ElbowRight].Position;
+
                                         var closer = handRight.Z < handLeft.Z ? handRight : handLeft;
+                                        
 
                                         // Map the 2D position to the Unity space.
                                         var worldRight = map3dPointTo2d(handRight);
                                         var worldLeft = map3dPointTo2d(handLeft);
                                         var worldLeftCheek = map3dPointTo2d(leftCheekBone);
                                         var worldRightCheek = map3dPointTo2d(rightCheekBone);
+                                        var worldElbowRight = map3dPointTo2d(elbowRight);
+                                        var worldElbowLeft = map3dPointTo2d(elbowLeft);
                                         var distanceCheeks = worldRightCheek.x - worldLeftCheek.x;
                                         var worldFrontHead = map3dPointTo2d(frontHeadCenter);
                                         var worldCloser = map3dPointTo2d(closer);
                                         var worldSpineMid = map3dPointTo2d(spineMid);
 
-                                        var centerHand = (worldRight + worldLeft) / 2;
+                                        var midHand = (worldRight + worldLeft) / 2;
                                         var center = quad.GetComponent<Renderer>().bounds.center;
-                                        
+                                        var currentBallPosition = midHand;
 
-                                        
 
-                                        var currentBallPosition = centerHand;
+                                        float distanceShoulders = Mathf.Abs(worldElbowRight.x - worldElbowLeft.x);
+                                        float distanceHands = Mathf.Abs(worldRight.x - worldLeft.x);
+                                        float ratioHandShoulder = distanceHands / distanceShoulders;
+
+                                        ellapsedTime = Time.time - startTime;
+                                        if(timeChecker && ellapsedTime > 3.95f)
+                                        {
+                                            print("ellapsed time: " + ellapsedTime);
+                                            Renderer rend = videoTransformation.GetComponent<Renderer>();
+                                            rend.enabled = false;
+                                            timeChecker = false;
+                                        }
+
+                                        //Charge Energie if hands are close to each other
+                                        if(ratioHandShoulder < 0.5 && worldSpineMid.y < worldLeft.y && worldSpineMid.y < worldRight.y)
+                                        {
+                                            powerLevel++;
+                                            stringPowerLevel = "Power Level: " + powerLevel;
+                                            if (powerLevel % 100 == 0)
+                                            {
+                                                Renderer rend = videoTransformation.GetComponent<Renderer>();
+                                                rend.enabled = true;
+                                                vp.Play();
+                                                startTime = Time.time;
+                                                timeChecker = true;
+                                            }
+                                        }
+
 
                                         switch (expressionState)
                                         {
                                             case "idle":
-                                                currentBallPosition = centerHand;
+                                                currentBallPosition = midHand;
                                                 reference = (handRight.Z + handLeft.Z)/2;
                                                 break;
 
@@ -323,10 +369,7 @@ public class MirrorScene : MonoBehaviour
                                         ball.transform.localScale = new Vector3(scale, scale, scale) / reference;
                                         ball.transform.position = new Vector3(currentBallPosition.x - center.x, -currentBallPosition.y, -1f);
                                         //ball.transform.Rotate(0f, speed, 0f);
-                                        //auraRed1.transform.localScale = new Vector3(scale, 1.8f*scale, scale) / spineMid.Z / 3;
-                                        //auraRed1.transform.position = new Vector3(worldSpineMid.x + center.x, -worldSpineMid.y -reference + scale, -1f);
-                                        //auraRed2.transform.localScale = new Vector3(scale, scale, scale) / spineMid.Z / 2;
-                                        //auraRed2.transform.position = new Vector3(worldSpineMid.x + center.x- scale, -worldSpineMid.y - 2*scale, -1f);
+                                        videoTransformation.transform.position = new Vector3(worldFrontHead.x, 0, 0);
 
 
                                         //Show hair
