@@ -41,7 +41,12 @@ public class MirrorScene : MonoBehaviour
     public GameObject hair;
     public GameObject textboxManager;
     public GameObject videoTransformation;
-    public VideoPlayer vp;
+
+    // Videos and Audio
+    public VideoPlayer vpYellow;
+    public VideoPlayer vpDeepYellow;
+    public VideoPlayer vpBlue;
+    public UnityEngine.AudioSource transformSound;
 
     // Parameters
     public float scale = 2f;
@@ -181,7 +186,7 @@ public class MirrorScene : MonoBehaviour
     void Start()
     {
         Renderer rend = videoTransformation.GetComponent<Renderer>();
-        rend.enabled = true;
+        rend.enabled = false;
         rend = ball.GetComponent<Renderer>();
         rend.enabled = false;
         rend = hair.GetComponent<Renderer>();
@@ -290,12 +295,11 @@ public class MirrorScene : MonoBehaviour
                                         
 
                                         // Detect the hand (left or right) that is closest to the sensor.
-                                        var handRight = body.Joints[JointType.HandTipRight].Position;
-                                        var handLeft = body.Joints[JointType.HandTipLeft].Position;
-                                        var spineMid = body.Joints[JointType.SpineMid].Position;
+                                        var handRight = body.Joints[JointType.HandRight].Position;
+                                        var handLeft = body.Joints[JointType.HandLeft].Position;
                                         var elbowLeft = body.Joints[JointType.ElbowLeft].Position;
                                         var elbowRight = body.Joints[JointType.ElbowRight].Position;
-
+                                        
                                         var closer = handRight.Z < handLeft.Z ? handRight : handLeft;
                                         
 
@@ -309,19 +313,15 @@ public class MirrorScene : MonoBehaviour
                                         var distanceCheeks = worldRightCheek.x - worldLeftCheek.x;
                                         var worldFrontHead = map3dPointTo2d(frontHeadCenter);
                                         var worldCloser = map3dPointTo2d(closer);
-                                        var worldSpineMid = map3dPointTo2d(spineMid);
+                                       
 
                                         var midHand = (worldRight + worldLeft) / 2;
                                         var center = quad.GetComponent<Renderer>().bounds.center;
                                         var currentBallPosition = midHand;
 
 
-                                        float distanceShoulders = Mathf.Abs(worldElbowRight.x - worldElbowLeft.x);
-                                        float distanceHands = Mathf.Abs(worldRight.x - worldLeft.x);
-                                        float ratioHandShoulder = distanceHands / distanceShoulders;
-
                                         ellapsedTime = Time.time - startTime;
-                                        if(timeChecker && ellapsedTime > 3.95f)
+                                        if(timeChecker && ellapsedTime > 5.18f)
                                         {
                                             print("ellapsed time: " + ellapsedTime);
                                             Renderer rend = videoTransformation.GetComponent<Renderer>();
@@ -329,19 +329,39 @@ public class MirrorScene : MonoBehaviour
                                             timeChecker = false;
                                         }
 
-                                        //Charge Energie if hands are close to each other
-                                        if(ratioHandShoulder < 0.5 && worldSpineMid.y < worldLeft.y && worldSpineMid.y < worldRight.y)
+                                        //Charge Energie if hands are close to each other and below middle of body
+                                        float distanceShoulders = Mathf.Abs(worldElbowRight.x - worldElbowLeft.x);
+                                        float distanceHands = Mathf.Abs(worldRight.x - worldLeft.x);
+                                        float ratioHandShoulder = distanceHands / distanceShoulders;
+
+                                        if (ratioHandShoulder < 0.8 )
                                         {
                                             powerLevel++;
                                             stringPowerLevel = "Power Level: " + powerLevel;
-                                            if (powerLevel % 100 == 0)
+                                            if (powerLevel % 100 == 0 && powerLevel < 400)
                                             {
+                                                
                                                 Renderer rend = videoTransformation.GetComponent<Renderer>();
-                                                rend.enabled = true;
-                                                vp.Play();
+                                                if(powerLevel == 100)
+                                                {
+                                                    vpYellow.Play();
+                                                    rend.enabled = true;
+                                                }
+                                                else if(powerLevel == 200)
+                                                {
+                                                    vpDeepYellow.Play();
+                                                    rend.enabled = true;
+                                                }
+                                                else if(powerLevel == 300)
+                                                {
+                                                    vpBlue.Play();
+                                                    rend.enabled = true;
+                                                }
+                                                transformSound.Play();
                                                 startTime = Time.time;
                                                 timeChecker = true;
                                             }
+                                            
                                         }
 
 
@@ -373,8 +393,9 @@ public class MirrorScene : MonoBehaviour
 
 
                                         //Show hair
-                                        hair.transform.localScale = new Vector3(distanceCheeks*400, distanceCheeks*400, distanceCheeks*400);
-                                        hair.transform.position = new Vector3(worldFrontHead.x - center.x , -worldFrontHead.y- distanceCheeks*3.8f, -1f);
+                                        Renderer rendo = hair.GetComponent<Renderer>();
+                                        rendo.enabled = false;
+                                        hair.transform.position = new Vector3(worldFrontHead.x, -3, 0);
                                         changeColorOfGameObject(UnityEngine.Color.black, UnityEngine.Color.yellow, hair, ref flagHair, ref tHair);
                                         changeColorOfGameObject(UnityEngine.Color.yellow, UnityEngine.Color.blue, ball, ref flagBall, ref tBall);
                                     }
