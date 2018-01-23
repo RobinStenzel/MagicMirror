@@ -4,6 +4,7 @@ using Windows.Kinect;
 using Microsoft.Kinect.Face;
 using UnityEngine.UI;
 using UnityEngine.Video;
+using System;
 
 public class MirrorScene : MonoBehaviour
 {
@@ -41,12 +42,15 @@ public class MirrorScene : MonoBehaviour
     public GameObject hair;
     public GameObject textboxManager;
     public GameObject videoTransformation;
+    public GameObject videoKamehameha;
 
     // Videos and Audio
     public VideoPlayer vpYellow;
     public VideoPlayer vpDeepYellow;
     public VideoPlayer vpBlue;
+    public VideoPlayer vpKamehameha;
     public UnityEngine.AudioSource transformSound;
+    public UnityEngine.AudioSource chargeSound;
 
     // Parameters
     public float scale = 2f;
@@ -54,7 +58,6 @@ public class MirrorScene : MonoBehaviour
     public string expressionState = "idle";
 
     //Strings for texbox and UI
-    private float powerLevel = 0;
     public Text textboxLeft;
     private string stringEyeLeft = "";
     private string stringEyeRight = "";
@@ -62,6 +65,8 @@ public class MirrorScene : MonoBehaviour
     private string stringHappy = "";
     private string stringGlasses = "";
     private string stringPowerLevel = "";
+    private string stringKamehameha = "";
+    private string stringAngle = "";
 
     //Color changing over time
     private bool flagHair = false;
@@ -73,6 +78,13 @@ public class MirrorScene : MonoBehaviour
     private float startTime = 0;
     private float ellapsedTime = 0;
     private bool timeChecker = false;
+    private bool alreadyPlaying = false;
+
+    //Booleans for interactions
+    private float powerLevel = 0;
+    private float kamehameha = 0;
+    private bool chargeKamehameha = false;
+    private bool inAnimation = false;
 
 
     private void changeColorOfGameObject(UnityEngine.Color inColor, UnityEngine.Color outColor, GameObject obj, ref bool flag, ref float t)
@@ -187,6 +199,8 @@ public class MirrorScene : MonoBehaviour
     {
         Renderer rend = videoTransformation.GetComponent<Renderer>();
         rend.enabled = false;
+        rend = videoKamehameha.GetComponent<Renderer>();
+        rend.enabled = false;
         rend = ball.GetComponent<Renderer>();
         rend.enabled = false;
         rend = hair.GetComponent<Renderer>();
@@ -291,7 +305,8 @@ public class MirrorScene : MonoBehaviour
                                         updateExpressions(result);
                                         textboxLeft.text = stringEyeLeft + System.Environment.NewLine
                                         + stringEyeRight + System.Environment.NewLine + stringHappy + System.Environment.NewLine
-                                        + stringGlasses + System.Environment.NewLine + stringPowerLevel;
+                                        + stringGlasses + System.Environment.NewLine + stringPowerLevel + System.Environment.NewLine
+                                        + stringAngle + System.Environment.NewLine + stringKamehameha;
                                         
 
                                         // Detect the hand (left or right) that is closest to the sensor.
@@ -299,7 +314,9 @@ public class MirrorScene : MonoBehaviour
                                         var handLeft = body.Joints[JointType.HandLeft].Position;
                                         var elbowLeft = body.Joints[JointType.ElbowLeft].Position;
                                         var elbowRight = body.Joints[JointType.ElbowRight].Position;
-                                        
+                                        var hipLeft = body.Joints[JointType.HipLeft].Position;
+                                        var hipRight = body.Joints[JointType.HipRight].Position;
+
                                         var closer = handRight.Z < handLeft.Z ? handRight : handLeft;
                                         
 
@@ -310,6 +327,8 @@ public class MirrorScene : MonoBehaviour
                                         var worldRightCheek = map3dPointTo2d(rightCheekBone);
                                         var worldElbowRight = map3dPointTo2d(elbowRight);
                                         var worldElbowLeft = map3dPointTo2d(elbowLeft);
+                                        var worldLeftHip = map3dPointTo2d(hipLeft);
+                                        var worldRightHip = map3dPointTo2d(hipRight);
                                         var distanceCheeks = worldRightCheek.x - worldLeftCheek.x;
                                         var worldFrontHead = map3dPointTo2d(frontHeadCenter);
                                         var worldCloser = map3dPointTo2d(closer);
@@ -323,8 +342,9 @@ public class MirrorScene : MonoBehaviour
                                         ellapsedTime = Time.time - startTime;
                                         if(timeChecker && ellapsedTime > 5.18f)
                                         {
-                                            print("ellapsed time: " + ellapsedTime);
                                             Renderer rend = videoTransformation.GetComponent<Renderer>();
+                                            rend.enabled = false;
+                                            rend = videoKamehameha.GetComponent<Renderer>();
                                             rend.enabled = false;
                                             timeChecker = false;
                                         }
@@ -333,36 +353,78 @@ public class MirrorScene : MonoBehaviour
                                         float distanceShoulders = Mathf.Abs(worldElbowRight.x - worldElbowLeft.x);
                                         float distanceHands = Mathf.Abs(worldRight.x - worldLeft.x);
                                         float ratioHandShoulder = distanceHands / distanceShoulders;
-
-                                        if (ratioHandShoulder < 0.8 )
+                                        if(worldRight.x < worldLeftHip.x && worldLeft.x < worldLeftHip.x
+                                            || worldRight.x > worldRightHip.x && worldLeft.x > worldRightHip.x)
                                         {
-                                            powerLevel++;
-                                            stringPowerLevel = "Power Level: " + powerLevel;
-                                            if (powerLevel % 100 == 0 && powerLevel < 400)
+                                            chargeKamehameha = true;
+                                        }
+                                        else
+                                        {
+                                            chargeKamehameha = false;
+                                        }
+
+                                        if (ratioHandShoulder < 0.6 && !timeChecker)
+                                        {
+                                            if (!chargeKamehameha)
                                             {
-                                                
-                                                Renderer rend = videoTransformation.GetComponent<Renderer>();
-                                                if(powerLevel == 100)
+                                                if (!alreadyPlaying)
                                                 {
-                                                    vpYellow.Play();
-                                                    rend.enabled = true;
+                                                    alreadyPlaying = true;
+                                                    chargeSound.Play();
                                                 }
-                                                else if(powerLevel == 200)
+                                                if (!timeChecker)
                                                 {
-                                                    vpDeepYellow.Play();
-                                                    rend.enabled = true;
+                                                    chargeSound.UnPause();
                                                 }
-                                                else if(powerLevel == 300)
+                                                powerLevel++;
+                                                stringPowerLevel = "Power Level: " + powerLevel;
+                                                if (powerLevel % 100 == 0 && powerLevel < 400)
                                                 {
-                                                    vpBlue.Play();
-                                                    rend.enabled = true;
+                                                    chargeSound.Pause();
+                                                    Renderer rend = videoTransformation.GetComponent<Renderer>();
+                                                    if (powerLevel == 100)
+                                                    {
+                                                        vpYellow.Play();
+                                                        rend.enabled = true;
+                                                    }
+                                                    else if (powerLevel == 200)
+                                                    {
+                                                        vpDeepYellow.Play();
+                                                        rend.enabled = true;
+                                                    }
+                                                    else if (powerLevel == 300)
+                                                    {
+                                                        vpBlue.Play();
+                                                        rend.enabled = true;
+                                                    }
+                                                    transformSound.Play();
+                                                    startTime = Time.time;
+                                                    timeChecker = true;
                                                 }
-                                                transformSound.Play();
-                                                startTime = Time.time;
-                                                timeChecker = true;
+
                                             }
+                                            //hands close and kamehameha position
+                                            else
+                                            {
+                                                chargeSound.Pause();
+                                                kamehameha++;
+                                                stringKamehameha = "Kamehameha Level: " + kamehameha;
+                                                if(kamehameha % 100 == 0)
+                                                {
+                                                    Renderer rend = videoKamehameha.GetComponent<Renderer>();
+                                                    rend.enabled = true;
+                                                    vpKamehameha.Play();
+                                                    startTime = Time.time;
+                                                    timeChecker = true;
+                                                }
+                                            }
+                                        }
+                                        //hands not close
+                                        else
+                                        {
                                             
                                         }
+                                            
 
 
                                         switch (expressionState)
@@ -390,6 +452,29 @@ public class MirrorScene : MonoBehaviour
                                         ball.transform.position = new Vector3(currentBallPosition.x - center.x, -currentBallPosition.y, -1f);
                                         //ball.transform.Rotate(0f, speed, 0f);
                                         videoTransformation.transform.position = new Vector3(worldFrontHead.x, 0, 0);
+
+                                        //kamehameha
+                                        double xDiff = worldRight.x - worldElbowRight.x;
+                                        double yDiff = worldRight.y - worldElbowRight.y;
+                                        float angleRad = (float)Math.Atan2(yDiff, xDiff);
+                                        float angleDeg = (float)(Math.Atan2(yDiff, xDiff) / Math.PI * 180);
+                                        float widthKamehamha;
+                                        if (Math.Abs(angleDeg) < 90)
+                                        {
+                                            widthKamehamha = 8 - worldRight.x;
+                                        }
+                                        else
+                                        {
+                                            widthKamehamha = 8 + worldRight.x;
+                                        }
+                                        float xMovement = (float) (Math.Cos(-angleRad) * widthKamehamha / 2);
+                                        float yMovement = (float) (Math.Sin(-angleRad) * widthKamehamha / 2);
+                                        videoKamehameha.transform.rotation = Quaternion.Euler(0, 0, -angleDeg + 180);
+                                        stringAngle = "Angle: ";
+                                        stringAngle += -angleDeg;
+                                        videoKamehameha.transform.position = new Vector3(worldRight.x + xMovement, -worldRight.y + yMovement, 0);
+                                        videoKamehameha.transform.localScale = new Vector3(widthKamehamha, 4.5f, 1);
+
 
 
                                         //Show hair
