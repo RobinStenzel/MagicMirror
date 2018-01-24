@@ -5,6 +5,7 @@ using Microsoft.Kinect.Face;
 using UnityEngine.UI;
 using UnityEngine.Video;
 using System;
+using UnityEngine.SceneManagement;
 
 public class MirrorScene : MonoBehaviour
 {
@@ -12,23 +13,8 @@ public class MirrorScene : MonoBehaviour
     private KinectSensor sensor;
     private ColorFrameReader colorReader;
     private BodyFrameReader bodyReader;
-    private FaceFrameSource faceSource;
-    private FaceFrameReader faceReader;
-
-    // Acquires HD face data and reads it.
-    private HighDefinitionFaceFrameSource HDfaceSource = null;
-    private HighDefinitionFaceFrameReader HDfaceReader = null;
-
-    // Required to access the face vertices.
-    private FaceAlignment _faceAlignment = null;
-
-    // Required to access the face model points.
-    private FaceModel _faceModel = null;
     private Body[] bodies;
 
-    //points tracked by the HD reader
-    CameraSpacePoint frontHeadCenter, leftCheekBone, rightCheekBone;
-    float reference = 1;
 
     // Color frame display.
     private Texture2D texture;
@@ -38,8 +24,6 @@ public class MirrorScene : MonoBehaviour
 
     // Visual elements.
     public GameObject quad;
-    public GameObject ball;
-    public GameObject hair;
     public GameObject textboxManager;
     public GameObject videoTransformation;
     public GameObject videoKamehameha;
@@ -48,31 +32,28 @@ public class MirrorScene : MonoBehaviour
     public VideoPlayer vpYellow;
     public VideoPlayer vpDeepYellow;
     public VideoPlayer vpBlue;
+    public VideoPlayer vpYellowLoop;
+    public VideoPlayer vpDeepYellowLoop;
+    public VideoPlayer vpBlueLoop;
     public VideoPlayer vpKamehameha;
     public UnityEngine.AudioSource transformSound;
     public UnityEngine.AudioSource chargeSound;
+    public UnityEngine.AudioSource saiyanChargeSound;
+    public UnityEngine.AudioSource powerUp1;
+    public UnityEngine.AudioSource powerUp2;
+    public UnityEngine.AudioSource powerUp3;
+
 
     // Parameters
     public float scale = 2f;
     public float speed = 10f;
-    public string expressionState = "idle";
 
     //Strings for texbox and UI
     public Text textboxLeft;
-    private string stringEyeLeft = "";
-    private string stringEyeRight = "";
-    private string stringMouthOpen = "";
-    private string stringHappy = "";
-    private string stringGlasses = "";
+    public Text textboxRight;
     private string stringPowerLevel = "";
     private string stringKamehameha = "";
-    private string stringAngle = "";
-
-    //Color changing over time
-    private bool flagHair = false;
-    private bool flagBall = false;
-    private float tHair = 0;
-    private float tBall = 0;
+    private string stringTransformation = "";
 
     //Measuring time
     private float startTime = 0;
@@ -81,10 +62,11 @@ public class MirrorScene : MonoBehaviour
     private bool alreadyPlaying = false;
 
     //Booleans for interactions
-    private float powerLevel = 0;
+    private float powerLevel = 290;
     private float kamehameha = 0;
+    private float transformCounter = 2;
     private bool chargeKamehameha = false;
-    private bool inAnimation = false;
+    private bool inAnimationKameha = false;
 
 
     private void changeColorOfGameObject(UnityEngine.Color inColor, UnityEngine.Color outColor, GameObject obj, ref bool flag, ref float t)
@@ -125,86 +107,15 @@ public class MirrorScene : MonoBehaviour
         return worldPoint;
     }
     //help function for the HD face recognition
-    private void UpdateFacePoints()
-    {
-        if (_faceModel == null) return;
+   
 
-        var vertices = _faceModel.CalculateVerticesForAlignment(_faceAlignment);
-        if (vertices.Count > 0)
-        {
-            frontHeadCenter = vertices[28];
-            leftCheekBone = vertices[458];
-            rightCheekBone = vertices[674];
-        }
-    }
-
-    //function to update face expressions
-    void updateExpressions(FaceFrameResult result)
-    {
-        // Detect Face Positions and Expressions
-        var eyeLeftClosed = result.FaceProperties[FaceProperty.LeftEyeClosed];
-        var eyeRightClosed = result.FaceProperties[FaceProperty.RightEyeClosed];
-        var mouthOpen = result.FaceProperties[FaceProperty.MouthOpen];
-        var happy = result.FaceProperties[FaceProperty.Happy];
-        var glasses = result.FaceProperties[FaceProperty.WearingGlasses];
-
-        //Use Expressions to change behaviour
-        if (eyeLeftClosed == DetectionResult.Yes || eyeLeftClosed == DetectionResult.Maybe)
-        {
-            expressionState = "leftEyeClosed";
-            stringEyeLeft = "left eye: ";
-            stringEyeLeft += eyeLeftClosed == DetectionResult.Yes ? "yes" : "maybe";
-        }
-        else
-        {
-            stringEyeLeft = "left eye: no";
-        }
-        if (eyeRightClosed == DetectionResult.Yes || eyeRightClosed == DetectionResult.Maybe)
-        {
-            expressionState = "rightEyeClosed";
-            stringEyeRight = "right eye: ";
-            stringEyeRight += eyeRightClosed == DetectionResult.Yes ? "yes" : "maybe";
-        }
-        else
-        {
-            stringEyeRight = "right eye: no";
-        }
-        if (happy == DetectionResult.Yes || happy == DetectionResult.Maybe)
-        {
-            expressionState = happy == DetectionResult.Yes ? "idle": expressionState;
-            stringHappy = "smile: ";
-            stringHappy += happy == DetectionResult.Yes ? "yes" : "maybe";
-        }
-        else
-        {
-            stringHappy = "smile: no";
-
-        }
-        if(mouthOpen == DetectionResult.Yes || mouthOpen == DetectionResult.Maybe)
-        {
-            stringMouthOpen = "Mouth opened";
-            stringMouthOpen += mouthOpen == DetectionResult.Yes ? "yes" : "no";
-        }
-        if(glasses == DetectionResult.Yes)
-        {
-            stringGlasses = "glasses: yes";
-        }
-        else
-        {
-            stringGlasses = "glasses: no";
-        }
-
-    }
     void Start()
     {
         Renderer rend = videoTransformation.GetComponent<Renderer>();
         rend.enabled = false;
         rend = videoKamehameha.GetComponent<Renderer>();
         rend.enabled = false;
-        rend = ball.GetComponent<Renderer>();
-        rend.enabled = false;
-        rend = hair.GetComponent<Renderer>();
-        rend.enabled = false;
+
         sensor = KinectSensor.GetDefault();
 
         if (sensor != null)
@@ -212,23 +123,6 @@ public class MirrorScene : MonoBehaviour
             // Initialize readers.
             bodyReader = sensor.BodyFrameSource.OpenReader();
             colorReader = sensor.ColorFrameSource.OpenReader();
-
-            //Initialize face source and reader
-            faceSource = FaceFrameSource.Create(sensor,0, FaceFrameFeatures.BoundingBoxInColorSpace |
-                                                              FaceFrameFeatures.FaceEngagement |
-                                                              FaceFrameFeatures.Glasses |
-                                                              FaceFrameFeatures.Happy |
-                                                              FaceFrameFeatures.LeftEyeClosed |
-                                                              FaceFrameFeatures.MouthOpen |
-                                                              FaceFrameFeatures.PointsInColorSpace |
-                                                              FaceFrameFeatures.RightEyeClosed);
-            faceReader = faceSource.OpenReader();
-
-            // Listen for HD face data.
-            HDfaceSource = HighDefinitionFaceFrameSource.Create(sensor);
-            HDfaceReader = HDfaceSource.OpenReader();
-            _faceModel = FaceModel.Create();
-            _faceAlignment = FaceAlignment.Create();
 
             // Body frame data.
             bodies = new Body[sensor.BodyFrameSource.BodyCount];
@@ -249,6 +143,10 @@ public class MirrorScene : MonoBehaviour
 
     void Update()
     {
+        if (Input.GetMouseButtonDown(0))
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        }
         if (colorReader != null)
         {
             using (var frame = colorReader.AcquireLatestFrame())
@@ -262,17 +160,6 @@ public class MirrorScene : MonoBehaviour
             }
         }
         //HD face frame, update points and allignement
-        if (HDfaceReader != null)
-        {
-            using (var frame = HDfaceReader.AcquireLatestFrame())
-            {
-                if (frame != null && frame.IsFaceTracked)
-                {
-                    frame.GetAndRefreshFaceAlignmentResult(_faceAlignment);
-                    UpdateFacePoints();
-                }
-            }
-        }
         if (bodyReader != null)
         {
             using (var frame = bodyReader.AcquireLatestFrame())
@@ -280,215 +167,210 @@ public class MirrorScene : MonoBehaviour
                 if (frame != null)
                 {
                     frame.GetAndRefreshBodyData(bodies);
-
-                    var body = bodies.Where(b => b.IsTracked).FirstOrDefault();
+                    Body body = bodies.Where(b => b.IsTracked).FirstOrDefault();
+                    
+                    
                     if (body != null)
                     {
-                        //Assign face to tracked body
-                        if (!faceSource.IsTrackingIdValid)
+
+                        textboxRight.text = stringPowerLevel + System.Environment.NewLine
+                        + stringTransformation + System.Environment.NewLine + stringKamehameha;
+
+
+                        // Detect the hand (left or right) that is closest to the sensor.
+                        var handRight = body.Joints[JointType.HandRight].Position;
+                        var handLeft = body.Joints[JointType.HandLeft].Position;
+                        var elbowLeft = body.Joints[JointType.ElbowLeft].Position;
+                        var elbowRight = body.Joints[JointType.ElbowRight].Position;
+                        var hipLeft = body.Joints[JointType.HipLeft].Position;
+                        var hipRight = body.Joints[JointType.HipRight].Position;
+                        var spineBase = body.Joints[JointType.SpineBase].Position;
+                        var spineMid = body.Joints[JointType.SpineMid].Position;
+                        var head = body.Joints[JointType.Head].Position;
+
+
+                        var closer = handRight.Z < handLeft.Z ? handRight : handLeft;
+
+
+                        // Map the 2D position to the Unity space.
+                        var worldRight = map3dPointTo2d(handRight);
+                        var worldLeft = map3dPointTo2d(handLeft);
+                        var worldElbowRight = map3dPointTo2d(elbowRight);
+                        var worldElbowLeft = map3dPointTo2d(elbowLeft);
+                        var worldLeftHip = map3dPointTo2d(hipLeft);
+                        var worldRightHip = map3dPointTo2d(hipRight);
+                        var worldFrontHead = map3dPointTo2d(head);
+                        var worldCloser = map3dPointTo2d(closer);
+                        var worldSpineBase = map3dPointTo2d(spineBase);
+                        var worldSpineMid = map3dPointTo2d(spineMid);
+
+
+                        var midHand = (worldRight + worldLeft) / 2;
+                        var center = quad.GetComponent<Renderer>().bounds.center;
+                        var currentBallPosition = midHand;
+
+
+                        ellapsedTime = Time.time - startTime;
+                        if (timeChecker && ellapsedTime > 5.18f)
                         {
-                            faceSource.TrackingId = body.TrackingId;
+                            Renderer rend = videoTransformation.GetComponent<Renderer>();
+                            rend.enabled = false;
+                            rend = videoKamehameha.GetComponent<Renderer>();
+                            rend.enabled = false;
+
                         }
-                        if (!HDfaceSource.IsTrackingIdValid)
+
+                        if (timeChecker && ellapsedTime > 5.2f)
                         {
-                            HDfaceSource.TrackingId = body.TrackingId;
-                        }
-                        if (faceReader != null)
-                        {
-                            using(var faceFrame = faceReader.AcquireLatestFrame())
+                            Renderer rend = videoTransformation.GetComponent<Renderer>();
+                            if (transformCounter == 0)
                             {
-                                if(faceFrame != null)
+                                vpYellow.Stop();
+                                vpYellowLoop.Play();
+                                rend.enabled = true;
+                                powerUp1.Play();
+                                saiyanChargeSound.Play();
+                            }
+                            else if(transformCounter == 1)
+                            {
+                                vpDeepYellow.Stop();
+                                vpDeepYellowLoop.Play();
+                                rend.enabled = true;
+                                powerUp2.Play();
+                                saiyanChargeSound.Play();
+                            }
+                            else if(transformCounter == 2)
+                            {
+                                vpBlue.Stop();
+                                vpBlueLoop.Play();
+                                rend.enabled = true;
+                                powerUp3.Play();
+                                saiyanChargeSound.Play();
+                            }
+
+                            timeChecker = false;
+                        }
+
+                        //Charge Energie if hands are close to each other and below middle of body
+                        float distanceShoulders = Mathf.Abs(worldElbowRight.x - worldElbowLeft.x);
+                        float distanceHands = Mathf.Abs(worldRight.x - worldLeft.x);
+                        float ratioHandShoulder = distanceHands / distanceShoulders;
+                        if (worldRight.x < worldLeftHip.x && worldLeft.x < worldLeftHip.x
+                            || worldRight.x > worldRightHip.x && worldLeft.x > worldRightHip.x)
+                        {
+                            chargeKamehameha = true;
+                        }
+                        else
+                        {
+                            chargeKamehameha = false;
+                        }
+
+                        if(inAnimationKameha && Time.time - startTime > 0.2)
+                        {
+                            vpKamehameha.Play();
+                            if(kamehameha == 0)
+                            {
+                                vpKamehameha.Stop();
+                                inAnimationKameha = false;
+                            }
+                            else
+                            {
+                                kamehameha--;
+                                stringKamehameha = "Kamehameha Level: " + kamehameha;
+                            }
+                        }
+
+                        if (ratioHandShoulder < 0.6 && !timeChecker)
+                        {
+                            if (powerLevel < 301)
+                            {
+                                if (!alreadyPlaying)
                                 {
-                                    FaceFrameResult result = faceFrame.FaceFrameResult;
-                                    if(result != null)
+                                    alreadyPlaying = true;
+                                    chargeSound.Play();
+                                }
+                                if (!timeChecker)
+                                {
+                                    chargeSound.UnPause();
+                                }
+                                powerLevel++;
+                                stringPowerLevel = "Power Level: " + powerLevel;
+                                if (powerLevel % 100 == 0 && powerLevel < 400)
+                                {
+                                    Renderer rend = videoTransformation.GetComponent<Renderer>();
+                                    if (powerLevel == 100)
                                     {
-                                        updateExpressions(result);
-                                        textboxLeft.text = stringEyeLeft + System.Environment.NewLine
-                                        + stringEyeRight + System.Environment.NewLine + stringHappy + System.Environment.NewLine
-                                        + stringGlasses + System.Environment.NewLine + stringPowerLevel + System.Environment.NewLine
-                                        + stringAngle + System.Environment.NewLine + stringKamehameha;
-                                        
+                                        chargeSound.Stop();
+                                        vpYellow.Play();
+                                        rend.enabled = true;
+                                        stringTransformation = "Transformation: Super Saiyan";
 
-                                        // Detect the hand (left or right) that is closest to the sensor.
-                                        var handRight = body.Joints[JointType.HandRight].Position;
-                                        var handLeft = body.Joints[JointType.HandLeft].Position;
-                                        var elbowLeft = body.Joints[JointType.ElbowLeft].Position;
-                                        var elbowRight = body.Joints[JointType.ElbowRight].Position;
-                                        var hipLeft = body.Joints[JointType.HipLeft].Position;
-                                        var hipRight = body.Joints[JointType.HipRight].Position;
-
-                                        var closer = handRight.Z < handLeft.Z ? handRight : handLeft;
-                                        
-
-                                        // Map the 2D position to the Unity space.
-                                        var worldRight = map3dPointTo2d(handRight);
-                                        var worldLeft = map3dPointTo2d(handLeft);
-                                        var worldLeftCheek = map3dPointTo2d(leftCheekBone);
-                                        var worldRightCheek = map3dPointTo2d(rightCheekBone);
-                                        var worldElbowRight = map3dPointTo2d(elbowRight);
-                                        var worldElbowLeft = map3dPointTo2d(elbowLeft);
-                                        var worldLeftHip = map3dPointTo2d(hipLeft);
-                                        var worldRightHip = map3dPointTo2d(hipRight);
-                                        var distanceCheeks = worldRightCheek.x - worldLeftCheek.x;
-                                        var worldFrontHead = map3dPointTo2d(frontHeadCenter);
-                                        var worldCloser = map3dPointTo2d(closer);
-                                       
-
-                                        var midHand = (worldRight + worldLeft) / 2;
-                                        var center = quad.GetComponent<Renderer>().bounds.center;
-                                        var currentBallPosition = midHand;
-
-
-                                        ellapsedTime = Time.time - startTime;
-                                        if(timeChecker && ellapsedTime > 5.18f)
-                                        {
-                                            Renderer rend = videoTransformation.GetComponent<Renderer>();
-                                            rend.enabled = false;
-                                            rend = videoKamehameha.GetComponent<Renderer>();
-                                            rend.enabled = false;
-                                            timeChecker = false;
-                                        }
-
-                                        //Charge Energie if hands are close to each other and below middle of body
-                                        float distanceShoulders = Mathf.Abs(worldElbowRight.x - worldElbowLeft.x);
-                                        float distanceHands = Mathf.Abs(worldRight.x - worldLeft.x);
-                                        float ratioHandShoulder = distanceHands / distanceShoulders;
-                                        if(worldRight.x < worldLeftHip.x && worldLeft.x < worldLeftHip.x
-                                            || worldRight.x > worldRightHip.x && worldLeft.x > worldRightHip.x)
-                                        {
-                                            chargeKamehameha = true;
-                                        }
-                                        else
-                                        {
-                                            chargeKamehameha = false;
-                                        }
-
-                                        if (ratioHandShoulder < 0.6 && !timeChecker)
-                                        {
-                                            if (!chargeKamehameha)
-                                            {
-                                                if (!alreadyPlaying)
-                                                {
-                                                    alreadyPlaying = true;
-                                                    chargeSound.Play();
-                                                }
-                                                if (!timeChecker)
-                                                {
-                                                    chargeSound.UnPause();
-                                                }
-                                                powerLevel++;
-                                                stringPowerLevel = "Power Level: " + powerLevel;
-                                                if (powerLevel % 100 == 0 && powerLevel < 400)
-                                                {
-                                                    chargeSound.Pause();
-                                                    Renderer rend = videoTransformation.GetComponent<Renderer>();
-                                                    if (powerLevel == 100)
-                                                    {
-                                                        vpYellow.Play();
-                                                        rend.enabled = true;
-                                                    }
-                                                    else if (powerLevel == 200)
-                                                    {
-                                                        vpDeepYellow.Play();
-                                                        rend.enabled = true;
-                                                    }
-                                                    else if (powerLevel == 300)
-                                                    {
-                                                        vpBlue.Play();
-                                                        rend.enabled = true;
-                                                    }
-                                                    transformSound.Play();
-                                                    startTime = Time.time;
-                                                    timeChecker = true;
-                                                }
-
-                                            }
-                                            //hands close and kamehameha position
-                                            else
-                                            {
-                                                chargeSound.Pause();
-                                                kamehameha++;
-                                                stringKamehameha = "Kamehameha Level: " + kamehameha;
-                                                if(kamehameha % 100 == 0)
-                                                {
-                                                    Renderer rend = videoKamehameha.GetComponent<Renderer>();
-                                                    rend.enabled = true;
-                                                    vpKamehameha.Play();
-                                                    startTime = Time.time;
-                                                    timeChecker = true;
-                                                }
-                                            }
-                                        }
-                                        //hands not close
-                                        else
-                                        {
-                                            
-                                        }
-                                            
-
-
-                                        switch (expressionState)
-                                        {
-                                            case "idle":
-                                                currentBallPosition = midHand;
-                                                reference = (handRight.Z + handLeft.Z)/2;
-                                                break;
-
-                                            case "leftEyeClosed":
-                                                currentBallPosition = worldLeft;
-                                                reference = handLeft.Z;
-                                                break;
-
-                                            case "rightEyeClosed":
-                                                currentBallPosition = worldRight;
-                                                reference = handRight.Z;
-                                                break;
-
-                                       
-                                        }
-
-                                        // Move and rotate the ball.
-                                        ball.transform.localScale = new Vector3(scale, scale, scale) / reference;
-                                        ball.transform.position = new Vector3(currentBallPosition.x - center.x, -currentBallPosition.y, -1f);
-                                        //ball.transform.Rotate(0f, speed, 0f);
-                                        videoTransformation.transform.position = new Vector3(worldFrontHead.x, 0, 0);
-
-                                        //kamehameha
-                                        double xDiff = worldRight.x - worldElbowRight.x;
-                                        double yDiff = worldRight.y - worldElbowRight.y;
-                                        float angleRad = (float)Math.Atan2(yDiff, xDiff);
-                                        float angleDeg = (float)(Math.Atan2(yDiff, xDiff) / Math.PI * 180);
-                                        float widthKamehamha;
-                                        if (Math.Abs(angleDeg) < 90)
-                                        {
-                                            widthKamehamha = 8 - worldRight.x;
-                                        }
-                                        else
-                                        {
-                                            widthKamehamha = 8 + worldRight.x;
-                                        }
-                                        float xMovement = (float) (Math.Cos(-angleRad) * widthKamehamha / 2);
-                                        float yMovement = (float) (Math.Sin(-angleRad) * widthKamehamha / 2);
-                                        videoKamehameha.transform.rotation = Quaternion.Euler(0, 0, -angleDeg + 180);
-                                        stringAngle = "Angle: ";
-                                        stringAngle += -angleDeg;
-                                        videoKamehameha.transform.position = new Vector3(worldRight.x + xMovement, -worldRight.y + yMovement, 0);
-                                        videoKamehameha.transform.localScale = new Vector3(widthKamehamha, 4.5f, 1);
-
-
-
-                                        //Show hair
-                                        Renderer rendo = hair.GetComponent<Renderer>();
-                                        rendo.enabled = false;
-                                        hair.transform.position = new Vector3(worldFrontHead.x, -3, 0);
-                                        changeColorOfGameObject(UnityEngine.Color.black, UnityEngine.Color.yellow, hair, ref flagHair, ref tHair);
-                                        changeColorOfGameObject(UnityEngine.Color.yellow, UnityEngine.Color.blue, ball, ref flagBall, ref tBall);
                                     }
+                                    else if (powerLevel == 200)
+                                    {
+                                        saiyanChargeSound.Stop();
+                                        vpDeepYellow.Play();
+                                        rend.enabled = true;
+                                        transformCounter++;
+                                        stringTransformation = "Transformation: Super Saiyan 2";
+                                    }
+                                    else if (powerLevel == 300)
+                                    {
+                                        saiyanChargeSound.Stop();
+                                        vpBlue.Play();
+                                        rend.enabled = true;
+                                        transformCounter++;
+                                        stringTransformation = "Transformation: Super Saiyan God";
+                                    }
+                                    transformSound.Play();
+                                    startTime = Time.time;
+                                    timeChecker = true;
+                                }
+
+                            }
+                            //hands close and kamehameha position
+                            else if(chargeKamehameha && !inAnimationKameha)
+                            {
+                                kamehameha++;
+                                stringKamehameha = "Kamehameha Level: " + kamehameha;
+                                if (kamehameha % 100 == 0)
+                                {
+                                    vpBlueLoop.Stop();
+                                    saiyanChargeSound.Pause();
+                                    Renderer rend = videoKamehameha.GetComponent<Renderer>();
+                                    rend.enabled = true;
+                                    inAnimationKameha = true;
+                                    startTime = Time.time;
                                 }
                             }
                         }
-                        
+
+                        videoTransformation.transform.position = new Vector3(worldFrontHead.x, -worldSpineMid.y, 0);
+
+                        //kamehameha
+                        double xDiff = worldRight.x - worldElbowRight.x;
+                        double yDiff = worldRight.y - worldElbowRight.y;
+                        float angleRad = (float)Math.Atan2(yDiff, xDiff);
+                        float angleDeg = (float)(Math.Atan2(yDiff, xDiff) / Math.PI * 180);
+                        float widthKamehamha;
+                        if (Math.Abs(angleDeg) < 90)
+                        {
+                            widthKamehamha = 8 - worldRight.x;
+                        }
+                        else
+                        {
+                            widthKamehamha = 8 + worldRight.x;
+                        }
+                        float xMovement = (float)(Math.Cos(-angleRad) * widthKamehamha / 2);
+                        float yMovement = (float)(Math.Sin(-angleRad) * widthKamehamha / 2);
+                        videoKamehameha.transform.rotation = Quaternion.Euler(0, 0, -angleDeg + 180);
+                        videoKamehameha.transform.position = new Vector3(worldRight.x + xMovement, -worldRight.y + yMovement, 0);
+                        videoKamehameha.transform.localScale = new Vector3(widthKamehamha, 4.5f, 1);
+
                     }
+
+
+                
                 }
             }
         }
@@ -506,20 +388,6 @@ public class MirrorScene : MonoBehaviour
             colorReader.Dispose();
         }
 
-        if(faceReader != null)
-        {
-            faceReader.Dispose();
-        }
-
-        if (HDfaceReader != null)
-        {
-            HDfaceReader.Dispose();
-        }
-
-        if (_faceModel != null)
-        {
-            _faceModel.Dispose();
-        }
 
         if (sensor != null && sensor.IsOpen)
         {
