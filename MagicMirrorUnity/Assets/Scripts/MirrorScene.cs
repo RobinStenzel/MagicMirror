@@ -39,6 +39,8 @@ public class MirrorScene : MonoBehaviour
     public UnityEngine.AudioSource transformSound;
     public UnityEngine.AudioSource chargeSound;
     public UnityEngine.AudioSource saiyanChargeSound;
+    public UnityEngine.AudioSource saiyanChargeSound2;
+    public UnityEngine.AudioSource saiyanChargeSound3;
     public UnityEngine.AudioSource powerUp1;
     public UnityEngine.AudioSource powerUp2;
     public UnityEngine.AudioSource powerUp3;
@@ -56,7 +58,7 @@ public class MirrorScene : MonoBehaviour
     private string stringTransformation = "Saiyan";
     private string stringIndication = "Indication:" + System.Environment.NewLine + System.Environment.NewLine 
         + "Amène tes mains ensemble pour générer de l'energie" + System.Environment.NewLine + System.Environment.NewLine
-        + "Obtain PowerLevel 300 pour apprendre le 'Kaméhaméha'";
+        + "Obtenir PowerLevel 400 pour apprendre le 'Kaméhaméha'";
 
     //Measuring time
     private float startTime = 0;
@@ -264,6 +266,7 @@ public class MirrorScene : MonoBehaviour
                                 vpYellowLoop.Play();
                                 rend.enabled = true;
                                 powerUp1.Play();
+                                stringTransformation = "Super Saiyan";
                                 saiyanChargeSound.Play();
                             }
                             else if(transformCounter == 1)
@@ -272,7 +275,8 @@ public class MirrorScene : MonoBehaviour
                                 vpDeepYellowLoop.Play();
                                 rend.enabled = true;
                                 powerUp2.Play();
-                                saiyanChargeSound.Play();
+                                stringTransformation = "Super Saiyan 2";
+                                saiyanChargeSound2.Play();
                             }
                             else if(transformCounter == 2)
                             {
@@ -280,7 +284,8 @@ public class MirrorScene : MonoBehaviour
                                 vpBlueLoop.Play();
                                 rend.enabled = true;
                                 powerUp3.Play();
-                                saiyanChargeSound.Play();
+                                stringTransformation = "Super Saiyan God";
+                                saiyanChargeSound3.Play();
                             }
 
                             timeChecker = false;
@@ -292,7 +297,7 @@ public class MirrorScene : MonoBehaviour
                         float ratioHandShoulder = distanceHands / distanceShoulders;
                         if ((worldRight.x < worldLeftHip.x && worldLeft.x < worldLeftHip.x
                             || worldRight.x > worldRightHip.x && worldLeft.x > worldRightHip.x)
-                            && !inAnimationKameha && powerLevel > 300)
+                            && !inAnimationKameha && powerLevel >= 400 && ratioHandShoulder < 0.75f)
                         {
                             if(loadingSide == 0 && worldRight.x < worldLeftHip.x && worldLeft.x < worldLeftHip.x)
                             {
@@ -350,7 +355,7 @@ public class MirrorScene : MonoBehaviour
 
                         if (ratioHandShoulder < 0.6 && !timeChecker)
                         {
-                            if (powerLevel < 301)
+                            if (powerLevel < 400)
                             {
                                 if (!alreadyPlaying)
                                 {
@@ -362,6 +367,12 @@ public class MirrorScene : MonoBehaviour
                                     chargeSound.UnPause();
                                 }
                                 powerLevel++;
+                                if(powerLevel == 400)
+                                {
+                                    stringIndication = "Indication:" + System.Environment.NewLine + System.Environment.NewLine
+                                                    + "Tiens tes mains à une coté de ton corps pour charger le 'Kaméhaméha'" + System.Environment.NewLine + System.Environment.NewLine
+                                                    + "Amène-les à l'autre côté pour l'activer";
+                                }
                                 stringPowerLevel = "Power Level: " + powerLevel;
                                 if (powerLevel % 100 == 0 && powerLevel < 400)
                                 {
@@ -371,28 +382,22 @@ public class MirrorScene : MonoBehaviour
                                         chargeSound.Stop();
                                         vpYellow.Play();
                                         rend.enabled = true;
-                                        stringTransformation = "Super Saiyan";
-
-                                    }
+                                       }
                                     else if (powerLevel == 200)
                                     {
                                         saiyanChargeSound.Stop();
                                         vpDeepYellow.Play();
                                         rend.enabled = true;
                                         transformCounter++;
-                                        stringTransformation = "Super Saiyan 2";
                                     }
                                     else if (powerLevel == 300)
                                     {
-                                        saiyanChargeSound.Stop();
+                                        saiyanChargeSound2.Stop();
                                         vpBlue.Play();
                                         rend.enabled = true;
                                         transformCounter++;
-                                        stringTransformation = "Super Saiyan God";
-                                        stringIndication = "Indication:" + System.Environment.NewLine + System.Environment.NewLine
-                                        + "Tiens tes mains à une coté de ton corps pour charger le 'Kaméhaméha'" + System.Environment.NewLine + System.Environment.NewLine
-                                        + "Amène-les à l'autre côté pour l'activer";
                                     }
+
                                     transformSound.Play();
                                     startTime = Time.time;
                                     timeChecker = true;
@@ -406,7 +411,7 @@ public class MirrorScene : MonoBehaviour
                                 if (chargeKamehameha && !inAnimationKameha)
                                 {
                                     vpBlueLoop.Stop();
-                                    saiyanChargeSound.Pause();
+                                    saiyanChargeSound3.Pause();
                                 }
                             }
 
