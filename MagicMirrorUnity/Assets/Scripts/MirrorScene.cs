@@ -49,24 +49,30 @@ public class MirrorScene : MonoBehaviour
     public float speed = 10f;
 
     //Strings for texbox and UI
-    public Text textboxLeft;
-    public Text textboxRight;
-    private string stringPowerLevel = "";
-    private string stringKamehameha = "";
-    private string stringTransformation = "";
+    public Text textboxUp;
+    public Text textboxDown;
+    private string stringPowerLevel = "PowerLevel:";
+    private string stringKamehameha = "Kamehameha: 0";
+    private string stringTransformation = "Saiyan";
+    private string stringIndication = "Indication:" + System.Environment.NewLine + System.Environment.NewLine 
+        + "Amène tes mains ensemble pour générer de l'energie" + System.Environment.NewLine + System.Environment.NewLine
+        + "Obtain PowerLevel 300 pour apprendre le 'Kaméhaméha'";
 
     //Measuring time
     private float startTime = 0;
     private float ellapsedTime = 0;
+    private float kamehaBreak;
     private bool timeChecker = false;
     private bool alreadyPlaying = false;
-
+    
     //Booleans for interactions
-    private float powerLevel = 290;
+    private float powerLevel = 0;
     private float kamehameha = 0;
-    private float transformCounter = 2;
+    private float transformCounter = 0;
+    private float loadingSide = 0;
     private bool chargeKamehameha = false;
     private bool inAnimationKameha = false;
+    private bool kamehaBuffer = false;
 
 
     private void changeColorOfGameObject(UnityEngine.Color inColor, UnityEngine.Color outColor, GameObject obj, ref bool flag, ref float t)
@@ -106,8 +112,38 @@ public class MirrorScene : MonoBehaviour
         Vector3 worldPoint = Camera.main.ViewportToWorldPoint(new Vector3(resultVector.x / width, resultVector.y / height, 0f));
         return worldPoint;
     }
-    //help function for the HD face recognition
-   
+
+    private ulong currTrackingId = 0;
+    private Body GetActiveBody()
+    {
+        if (currTrackingId <= 0)
+        {
+            foreach (Body body in this.bodies)
+            {
+                if (body.IsTracked)
+                {
+                    currTrackingId = body.TrackingId;
+                    return body;
+                }
+            }
+
+            return null;
+        }
+        else
+        {
+            foreach (Body body in this.bodies)
+            {
+                if (body.IsTracked && body.TrackingId == currTrackingId)
+                {
+                    return body;
+                }
+            }
+        }
+
+        currTrackingId = 0;
+        return GetActiveBody();
+    }
+
 
     void Start()
     {
@@ -167,14 +203,15 @@ public class MirrorScene : MonoBehaviour
                 if (frame != null)
                 {
                     frame.GetAndRefreshBodyData(bodies);
-                    Body body = bodies.Where(b => b.IsTracked).FirstOrDefault();
+                    Body body = GetActiveBody();
                     
                     
                     if (body != null)
                     {
 
-                        textboxRight.text = stringPowerLevel + System.Environment.NewLine
-                        + stringTransformation + System.Environment.NewLine + stringKamehameha;
+                        textboxUp.text = stringTransformation + System.Environment.NewLine + System.Environment.NewLine + stringPowerLevel + System.Environment.NewLine
+                         + System.Environment.NewLine + stringKamehameha;
+                        textboxDown.text = stringIndication;
 
 
                         // Detect the hand (left or right) that is closest to the sensor.
@@ -215,8 +252,6 @@ public class MirrorScene : MonoBehaviour
                         {
                             Renderer rend = videoTransformation.GetComponent<Renderer>();
                             rend.enabled = false;
-                            rend = videoKamehameha.GetComponent<Renderer>();
-                            rend.enabled = false;
 
                         }
 
@@ -255,29 +290,62 @@ public class MirrorScene : MonoBehaviour
                         float distanceShoulders = Mathf.Abs(worldElbowRight.x - worldElbowLeft.x);
                         float distanceHands = Mathf.Abs(worldRight.x - worldLeft.x);
                         float ratioHandShoulder = distanceHands / distanceShoulders;
-                        if (worldRight.x < worldLeftHip.x && worldLeft.x < worldLeftHip.x
+                        if ((worldRight.x < worldLeftHip.x && worldLeft.x < worldLeftHip.x
                             || worldRight.x > worldRightHip.x && worldLeft.x > worldRightHip.x)
+                            && !inAnimationKameha && powerLevel > 300)
                         {
-                            chargeKamehameha = true;
+                            if(loadingSide == 0 && worldRight.x < worldLeftHip.x && worldLeft.x < worldLeftHip.x)
+                            {
+                                loadingSide = 1;
+                            }
+                            else if(loadingSide == 0 && worldRight.x > worldRightHip.x && worldLeft.x > worldRightHip.x)
+                            {
+                                loadingSide = 2;
+                            }
+                            else if(loadingSide == 1 && worldRight.x < worldLeftHip.x && worldLeft.x < worldLeftHip.x
+                                || loadingSide == 2 && worldRight.x > worldRightHip.x && worldLeft.x > worldRightHip.x)
+                            {
+                                kamehameha += 2;
+                                stringKamehameha = "Kamehameha: " + kamehameha;
+                            }
+                            else if (loadingSide == 2 && worldRight.x < worldLeftHip.x && worldLeft.x < worldLeftHip.x
+                                || loadingSide == 1 && worldRight.x > worldRightHip.x && worldLeft.x > worldRightHip.x)
+                            {
+                                loadingSide = 0;
+                                inAnimationKameha = true;
+                                startTime = Time.time;
+                                vpKamehameha.Play();
+                            }
+                                chargeKamehameha = true;
                         }
                         else
                         {
                             chargeKamehameha = false;
                         }
 
-                        if(inAnimationKameha && Time.time - startTime > 0.2)
+                        if(inAnimationKameha && Time.time - startTime > 0.2f && !kamehaBuffer)
                         {
-                            vpKamehameha.Play();
-                            if(kamehameha == 0)
+                            Renderer render = videoKamehameha.GetComponent<Renderer>();
+                            render.enabled = true;
+
+                            if (kamehameha == 0)
                             {
                                 vpKamehameha.Stop();
-                                inAnimationKameha = false;
+                                kamehaBuffer = true;
+                                kamehaBreak = Time.time;
+                                render.enabled = false;
                             }
                             else
                             {
                                 kamehameha--;
-                                stringKamehameha = "Kamehameha Level: " + kamehameha;
+                                stringKamehameha = "Kamehameha: " + kamehameha;
                             }
+                        }
+
+                        if(kamehaBuffer && Time.time - kamehaBreak > 3f)
+                        {
+                            kamehaBuffer = false;
+                            inAnimationKameha = false;
                         }
 
                         if (ratioHandShoulder < 0.6 && !timeChecker)
@@ -303,7 +371,7 @@ public class MirrorScene : MonoBehaviour
                                         chargeSound.Stop();
                                         vpYellow.Play();
                                         rend.enabled = true;
-                                        stringTransformation = "Transformation: Super Saiyan";
+                                        stringTransformation = "Super Saiyan";
 
                                     }
                                     else if (powerLevel == 200)
@@ -312,7 +380,7 @@ public class MirrorScene : MonoBehaviour
                                         vpDeepYellow.Play();
                                         rend.enabled = true;
                                         transformCounter++;
-                                        stringTransformation = "Transformation: Super Saiyan 2";
+                                        stringTransformation = "Super Saiyan 2";
                                     }
                                     else if (powerLevel == 300)
                                     {
@@ -320,7 +388,10 @@ public class MirrorScene : MonoBehaviour
                                         vpBlue.Play();
                                         rend.enabled = true;
                                         transformCounter++;
-                                        stringTransformation = "Transformation: Super Saiyan God";
+                                        stringTransformation = "Super Saiyan God";
+                                        stringIndication = "Indication:" + System.Environment.NewLine + System.Environment.NewLine
+                                        + "Tiens tes mains à une coté de ton corps pour charger le 'Kaméhaméha'" + System.Environment.NewLine + System.Environment.NewLine
+                                        + "Amène-les à l'autre côté pour l'activer";
                                     }
                                     transformSound.Play();
                                     startTime = Time.time;
@@ -329,20 +400,16 @@ public class MirrorScene : MonoBehaviour
 
                             }
                             //hands close and kamehameha position
-                            else if(chargeKamehameha && !inAnimationKameha)
+                            else
                             {
-                                kamehameha++;
-                                stringKamehameha = "Kamehameha Level: " + kamehameha;
-                                if (kamehameha % 100 == 0)
+
+                                if (chargeKamehameha && !inAnimationKameha)
                                 {
                                     vpBlueLoop.Stop();
                                     saiyanChargeSound.Pause();
-                                    Renderer rend = videoKamehameha.GetComponent<Renderer>();
-                                    rend.enabled = true;
-                                    inAnimationKameha = true;
-                                    startTime = Time.time;
                                 }
                             }
+
                         }
 
                         videoTransformation.transform.position = new Vector3(worldFrontHead.x, -worldSpineMid.y, 0);
@@ -355,11 +422,11 @@ public class MirrorScene : MonoBehaviour
                         float widthKamehamha;
                         if (Math.Abs(angleDeg) < 90)
                         {
-                            widthKamehamha = 8 - worldRight.x;
+                            widthKamehamha = 12;
                         }
                         else
                         {
-                            widthKamehamha = 8 + worldRight.x;
+                            widthKamehamha = 12;
                         }
                         float xMovement = (float)(Math.Cos(-angleRad) * widthKamehamha / 2);
                         float yMovement = (float)(Math.Sin(-angleRad) * widthKamehamha / 2);
