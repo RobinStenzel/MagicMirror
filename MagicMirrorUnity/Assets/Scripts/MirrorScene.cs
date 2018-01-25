@@ -44,6 +44,8 @@ public class MirrorScene : MonoBehaviour
     public UnityEngine.AudioSource powerUp1;
     public UnityEngine.AudioSource powerUp2;
     public UnityEngine.AudioSource powerUp3;
+    public UnityEngine.AudioSource kamehaCharge;
+    public UnityEngine.AudioSource kamehaShot;
 
 
     // Parameters
@@ -66,7 +68,8 @@ public class MirrorScene : MonoBehaviour
     private float kamehaBreak;
     private bool timeChecker = false;
     private bool alreadyPlaying = false;
-    
+    private bool alreadyPlayingKameha = false;
+
     //Booleans for interactions
     private float powerLevel = 0;
     private float kamehameha = 0;
@@ -310,7 +313,13 @@ public class MirrorScene : MonoBehaviour
                             else if(loadingSide == 1 && worldRight.x < worldLeftHip.x && worldLeft.x < worldLeftHip.x
                                 || loadingSide == 2 && worldRight.x > worldRightHip.x && worldLeft.x > worldRightHip.x)
                             {
-                                kamehameha += 2;
+                                kamehameha += 1;
+                                if (!alreadyPlayingKameha)
+                                {
+                                    kamehaCharge.Play();
+                                    alreadyPlayingKameha = true;
+                                }
+                                kamehaCharge.UnPause();
                                 stringKamehameha = "Kamehameha: " + kamehameha;
                             }
                             else if (loadingSide == 2 && worldRight.x < worldLeftHip.x && worldLeft.x < worldLeftHip.x
@@ -318,7 +327,10 @@ public class MirrorScene : MonoBehaviour
                             {
                                 loadingSide = 0;
                                 inAnimationKameha = true;
+                                alreadyPlayingKameha = false;
                                 startTime = Time.time;
+                                kamehaCharge.Stop();
+                                kamehaShot.Play();
                                 vpKamehameha.Play();
                             }
                                 chargeKamehameha = true;
@@ -326,16 +338,19 @@ public class MirrorScene : MonoBehaviour
                         else
                         {
                             chargeKamehameha = false;
+                            kamehaCharge.Pause();
                         }
 
-                        if(inAnimationKameha && Time.time - startTime > 0.2f && !kamehaBuffer)
+                        if(inAnimationKameha && Time.time - startTime > 0.4f && !kamehaBuffer)
                         {
                             Renderer render = videoKamehameha.GetComponent<Renderer>();
                             render.enabled = true;
 
                             if (kamehameha == 0)
                             {
+                                kamehameha = 0;
                                 vpKamehameha.Stop();
+                                kamehaShot.Stop();
                                 kamehaBuffer = true;
                                 kamehaBreak = Time.time;
                                 render.enabled = false;
@@ -420,24 +435,35 @@ public class MirrorScene : MonoBehaviour
                         videoTransformation.transform.position = new Vector3(worldFrontHead.x, -worldSpineMid.y, 0);
 
                         //kamehameha
-                        double xDiff = worldRight.x - worldElbowRight.x;
-                        double yDiff = worldRight.y - worldElbowRight.y;
-                        float angleRad = (float)Math.Atan2(yDiff, xDiff);
-                        float angleDeg = (float)(Math.Atan2(yDiff, xDiff) / Math.PI * 180);
-                        float widthKamehamha;
-                        if (Math.Abs(angleDeg) < 90)
+                        if (inAnimationKameha)
                         {
-                            widthKamehamha = 12;
+                            //right
+                            double xDiffRight = worldRight.x - worldElbowRight.x;
+                            double yDiffRight = worldRight.y - worldElbowRight.y;
+                            float angleRadRight = (float)Math.Atan2(yDiffRight, xDiffRight);
+                            float angleDegRight = (float)(Math.Atan2(yDiffRight, xDiffRight) / Math.PI * 180);
+                            float widthKamehamha = 12;
+
+                            //left
+                            double xDiffLeft = worldLeft.x - worldElbowLeft.x;
+                            double yDiffLeft = worldLeft.y - worldElbowLeft.y;
+                            float angleRadLeft = (float)Math.Atan2(yDiffLeft, xDiffLeft);
+                            float angleDegLeft = (float)(Math.Atan2(yDiffLeft, xDiffLeft) / Math.PI * 180);
+
+                            if(angleDegLeft < 0) { angleDegLeft += 360; }
+                            if(angleDegRight < 0) { angleDegRight += 360; }
+
+                            float angleDeg = (angleDegLeft + angleDegRight) / 2;
+                            if (Math.Abs(angleDegLeft - angleDegRight) > 180) { angleDeg -= 180; }
+                            float angleRad = (float)(angleDeg * Math.PI / 180);
+
+                            float xMovement = (float)(Math.Cos(-angleRad) * widthKamehamha / 2);
+                            float yMovement = (float)(Math.Sin(-angleRad) * widthKamehamha / 2);
+                            videoKamehameha.transform.rotation = Quaternion.Euler(0, 0, -angleDeg +180);
+                            videoKamehameha.transform.position = new Vector3(midHand.x + xMovement, -midHand.y + yMovement, 0);
+                            videoKamehameha.transform.localScale = new Vector3(widthKamehamha, 4.5f, 1);
                         }
-                        else
-                        {
-                            widthKamehamha = 12;
-                        }
-                        float xMovement = (float)(Math.Cos(-angleRad) * widthKamehamha / 2);
-                        float yMovement = (float)(Math.Sin(-angleRad) * widthKamehamha / 2);
-                        videoKamehameha.transform.rotation = Quaternion.Euler(0, 0, -angleDeg + 180);
-                        videoKamehameha.transform.position = new Vector3(worldRight.x + xMovement, -worldRight.y + yMovement, 0);
-                        videoKamehameha.transform.localScale = new Vector3(widthKamehamha, 4.5f, 1);
+
 
                     }
 
